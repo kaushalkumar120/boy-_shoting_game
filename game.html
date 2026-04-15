@@ -3,201 +3,120 @@
 <head>
 <title>Boy Shooting Game</title>
 <style>
-body{
-  background:#111;
-  color:white;
-  text-align:center;
-  font-family:Arial;
-}
-canvas{
-  background:#222;
-  display:block;
-  margin:auto;
-  border:3px solid white;
-}
-button{
-  padding:10px;
-  font-size:18px;
-  margin:5px;
-}
+body{background:#111;color:#fff;text-align:center;font-family:Arial}
+canvas{background:#222;display:block;margin:auto;border:3px solid #fff}
+button{padding:10px;font-size:18px;margin:5px}
 </style>
 </head>
 <body>
 
 <h1>🎮 Boy Shooting Game</h1>
-<button onclick="startGame()">Start Game</button>
+<button onclick="startGame()">Start</button>
 <button onclick="restartGame()">Restart</button>
 
 <canvas id="game" width="800" height="400"></canvas>
 
 <h2 id="score">Score: 0</h2>
-<h2 id="health">Health: 100</h2>
+<h2 id="health">Health: 3</h2>
 
 <audio id="bgMusic" loop>
   <source src="music.mp3" type="audio/mpeg">
 </audio>
 
 <script>
-const canvas=document.getElementById("game")
-const ctx=canvas.getContext("2d")
+const c = game.getContext("2d");
 
-let gameStart=false
-let score=0
-let health=100
+let gameStart=0, score=0, health=3;
+let player={x:50,y:180,speed:9};
+let bullets=[], enemies=[], explosions=[], keys={}, lastShot=0;
 
-let player={
-  x:50,
-  y:180,
-  speed:6
-}
+onkeydown=e=>keys[e.key]=1;
+onkeyup=e=>keys[e.key]=0;
 
-let bullets=[]
-let enemies=[]
-let explosions=[]
+const updateUI=()=>{
+  scoreEl.innerText="Score: "+score;
+  healthEl.innerText="Health: "+health;
+};
 
-let keys={}
-let lastShot=0
-let shootDelay=200   // shooting rate control
+const scoreEl=score, healthEl=health, bgMusic=document.getElementById("bgMusic");
 
-document.addEventListener("keydown",e=>{ keys[e.key]=true })
-document.addEventListener("keyup",e=>{ keys[e.key]=false })
-
-function startGame(){
-  gameStart=true
-  spawnEnemy()
-  document.getElementById("bgMusic").play()
-}
+function startGame(){ gameStart=1; spawnEnemy(); bgMusic.play(); }
 
 function restartGame(){
-  score=0
-  health=100
-  bullets=[]
-  enemies=[]
-  explosions=[]
-  player.x=50
-  player.y=180
-  document.getElementById("score").innerText="Score: 0"
-  document.getElementById("health").innerText="Health: 100"
-  gameStart=true
+  score=0; health=3;
+  bullets=enemies=explosions=[];
+  player.x=50; player.y=180;
+  updateUI(); gameStart=1;
 }
 
 function spawnEnemy(){
-  setInterval(()=>{
-    if(gameStart){
-      enemies.push({
-        x:750,
-        y:Math.random()*350,
-        speed:2
-      })
-    }
-  },2000) // every 2 sec new enemy
+  setInterval(()=>gameStart && enemies.push({
+    x:750, y:Math.random()*350, speed:2
+  }),2000);
 }
 
-function shoot(){
-  let now = Date.now()
-  if(now - lastShot > shootDelay){
-    bullets.push({x:player.x+40, y:player.y+15, speed:8})
-    lastShot = now
+const shoot=()=>{
+  let now=Date.now();
+  if(now-lastShot>200){
+    bullets.push({x:player.x+40,y:player.y+15,speed:8});
+    lastShot=now;
   }
-}
+};
 
-function movePlayer(){
-  if(keys["ArrowUp"] && player.y>0) player.y-=player.speed
-  if(keys["ArrowDown"] && player.y<360) player.y+=player.speed
-}
+const move=()=>{
+  if(keys.ArrowUp && player.y>0) player.y-=player.speed;
+  if(keys.ArrowDown && player.y<360) player.y+=player.speed;
+};
 
-function collision(a,b){
-  return (
-    a.x<b.x+30 &&
-    a.x+12>b.x &&
-    a.y<b.y+30 &&
-    a.y+12>b.y
-  )
-}
+const hit=(a,b)=>a.x<b.x+30&&a.x+12>b.x&&a.y<b.y+30&&a.y+12>b.y;
 
 function update(){
-  if(!gameStart) return
+  if(!gameStart) return;
+  move(); if(keys[" "]) shoot();
 
-  movePlayer()
+  bullets.forEach(b=>b.x+=b.speed);
+  enemies.forEach(e=>e.x-=e.speed);
 
-  if(keys[" "]) shoot()
-
-  // move bullets
-  bullets.forEach(b=>b.x+=b.speed)
-
-  // move enemies
-  enemies.forEach(e=>e.x-=e.speed)
-
-  // bullets hit enemy
   bullets.forEach((b,bi)=>{
     enemies.forEach((e,ei)=>{
-      if(collision(b,e)){
-        score++
-        document.getElementById("score").innerText="Score: "+score
-        explosions.push({x:e.x+15,y:e.y+15,size:10,time:20})
-        bullets.splice(bi,1)
-        enemies.splice(ei,1)
+      if(hit(b,e)){
+        score++; explosions.push({x:e.x+15,y:e.y+15,size:10,time:20});
+        bullets.splice(bi,1); enemies.splice(ei,1); updateUI();
       }
-    })
-  })
+    });
+  });
 
-  // enemy reach player
   enemies.forEach((e,ei)=>{
-    if(collision(e,player)){
-      health-=10
-      document.getElementById("health").innerText="Health: "+health
-      enemies.splice(ei,1)
+    if(hit(e,player)){
+      health-=3; enemies.splice(ei,1); updateUI();
     }
-  })
+  });
 
-  if(health<=0) gameStart=false
+  if(health<=0) gameStart=0;
 }
 
 function draw(){
-  ctx.clearRect(0,0,canvas.width,canvas.height)
+  c.clearRect(0,0,800,400);
 
   if(!gameStart){
-    ctx.fillStyle="white"
-    ctx.font="40px Arial"
-    ctx.fillText("GAME OVER",300,200)
-    return
+    c.fillStyle="#fff"; c.font="40px Arial";
+    return c.fillText("GAME OVER",300,200);
   }
 
-  // draw player
-  ctx.font="40px Arial"
-  ctx.fillText("🧍",player.x,player.y)
+  c.font="40px Arial";
+  c.fillText("🧍",player.x,player.y);
 
-  // draw bullets
-  bullets.forEach(b=>{
-    ctx.fillStyle="yellow"
-    ctx.fillRect(b.x,b.y,12,4)
-  })
+  bullets.forEach(b=>{c.fillStyle="yellow";c.fillRect(b.x,b.y,12,4)});
+  enemies.forEach(e=>c.fillText("👾",e.x,e.y));
 
-  // draw enemies
-  enemies.forEach(e=>{
-    ctx.font="40px Arial"
-    ctx.fillText("👾",e.x,e.y)
-  })
-
-  // draw explosions
   explosions.forEach((ex,i)=>{
-    ctx.fillStyle="orange"
-    ctx.beginPath()
-    ctx.arc(ex.x,ex.y,ex.size,0,Math.PI*2)
-    ctx.fill()
-    ex.size+=2
-    ex.time--
-    if(ex.time<=0) explosions.splice(i,1)
-  })
+    c.fillStyle="orange";
+    c.beginPath(); c.arc(ex.x,ex.y,ex.size,0,6.28); c.fill();
+    ex.size+=2; if(--ex.time<=0) explosions.splice(i,1);
+  });
 }
 
-function gameLoop(){
-  update()
-  draw()
-  requestAnimationFrame(gameLoop)
-}
-
-gameLoop()
+(function loop(){ update(); draw(); requestAnimationFrame(loop); })();
 </script>
 
 </body>
